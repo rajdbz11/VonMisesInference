@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import time
 import scipy.io
 from tqdm import tqdm
+import torch
 
 def VonMises(x,k,m):
 	"""
@@ -60,7 +61,7 @@ def DiscreteSingletonPotentials(N, KVec, MuVec):
 		KVec, MuVec = KVec[:,None], MuVec[:,None]
 	else:
 		MuVec 	= MuVec[:,None,:]			# MuVec has shape Ns x T, 	make it  Ns x 1 x T
-		KVec 	= KVec[:,None,None]			# KVec has shape Ns, 		make it  Ns x 1 x 1
+		KVec 	= KVec[:,None,:]			# KVec has shape Ns x T, 	make it  Ns x 1 x 1
 		x 		= x[None,:,None]			# x has shape N, 			make it   1 x N x 1
 
 	return VonMises(x, KVec, MuVec)*pi/N
@@ -397,6 +398,21 @@ def PiecewiseConstantNoise(Ny, T, T_const):
     return np.array(yMat).T
 
 
+def PiecewiseConstantGammaNoise(Ny, T, T_const, K_const, shape, scale):
+	# creates a piece wise constant gamma distributed noise signal
+    
+    L       = T//T_const + 1*(T%T_const != 0)
+    K_const /= 10 
+
+    yInd    = K_const*np.random.gamma(shape,scale,(Ny,L))
+    yMat 	= []
+    # Repeat each independent y for T_const time steps
+    for t in range(T):
+        yMat.append(yInd[:,t//T_const])
+
+    return np.array(yMat).T
+
+
 def GenerateDynamicMu(Ns, B, T, T_low, T_high):
 	# generate dynamic input orientation signal
 	
@@ -413,6 +429,25 @@ def GenerateDynamicMu(Ns, B, T, T_low, T_high):
 	    
 
 	return np.arctan2(np.array(z_imag), np.array(z_real))/2
+
+
+def GenerateDynamicK(Ns, B, T, T_low, T_high, K_low, K_high):
+	# generate dynamic input concentrations
+	
+	shape, scale = 2, 2 # gamma distribution parameters
+
+	smoothing_filter = signal.windows.hann(8)
+	smoothing_filter = smoothing_filter/sum(smoothing_filter)
+
+	K = []
+
+	for b in range(B):
+		T_const = np.random.randint(low=T_low,high=T_high)
+		K_const = K_high*np.random.rand(1)
+
+		K.append(signal.filtfilt(smoothing_filter, 1, PiecewiseConstantGammaNoise(Ns, T, T_const, K_const, shape, scale)))
+	    
+	return K_low + np.array(K)
 
 
 def generateCouplings(Ns, sp, K):
@@ -445,3 +480,20 @@ def generateCouplings(Ns, sp, K):
 	J = K*J*np.expand_dims(AdjMat,2)
 	
 	return J
+
+
+def CreateEmbeddingMat(Ns, R, gain_U):
+	Nr = R*Ns # total no. of neurons in brain
+
+	U = np.zeros([Nr,Ns*4])
+	for i in range(Ns):
+		U[i*R:(i+1)*R, i*4:(i+1)*4] = gain_U*np.random.randn(R,4)
+
+	return U
+
+
+def CreateNeuralTarget(U, x):
+	x = torch.tensor(x)
+	U = torch.tensor(U)
+	out = torch.matmul(U,x)
+	return out.data.numpy()

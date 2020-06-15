@@ -10,12 +10,12 @@ def DisplayGraphicalModel(J, node_positions,dpi):
 	Ns = J.shape[0]
 	fig, ax = plt.subplots(1,2,figsize=(10,3),dpi=dpi)
 	for i in range(Ns):
-	    for j in range(i+1):
-	        if i != j:
-	            ax[0].plot([node_positions[i][0], node_positions[j][0]],[node_positions[i][1], node_positions[j][1]],color = 'gray', linewidth = 3*J[i,j,3]/J_max)
-	    
+		for j in range(i+1):
+			if i != j:
+				ax[0].plot([node_positions[i][0], node_positions[j][0]],[node_positions[i][1], node_positions[j][1]],color = 'gray', linewidth = 3*J[i,j,3]/J_max)
+		
 	for k in range(Ns):
-	    ax[0].plot(node_positions[k][0],node_positions[k][1],'ko',markersize=10)
+		ax[0].plot(node_positions[k][0],node_positions[k][1],'ko',markersize=10)
 	ax[0].axis('off')
 	ax[0].set(title = 'graphical model')
 
@@ -77,6 +77,15 @@ def ComputeCircularMoments(z, K):
 	return z_cos2x, z_sin2x, z_cos4x, z_sin4x
 
 
+def ComputeCircularMomentsCat(z, K):
+	z_cos2x, z_sin2x, z_cos4x, z_sin4x = ComputeCircularMoments(z, K)
+	out = np.concatenate((z_cos2x[:,:,None,:], z_sin2x[:,:,None,:], z_cos4x[:,:,None,:], z_sin4x[:,:,None,:]),axis=2)
+	B, Ns, _, T = np.shape(out)
+	out = np.reshape(out, (B, Ns*4, T))
+	return out
+
+
+
 def DisplayCircularMoments1(local_inputs, beliefs, K):
 	l_cos2x, l_sin2x, l_cos4x, l_sin4x = ComputeCircularMoments(local_inputs, K)
 	b_cos2x, b_sin2x, b_cos4x, b_sin4x = ComputeCircularMoments(beliefs, K)	
@@ -96,8 +105,8 @@ def DisplayCircularMoments1(local_inputs, beliefs, K):
 	ax[3].plot([l_sin4x.min(), l_sin4x.max()],[l_sin4x.min(), l_sin4x.max()],color='cyan',linewidth=1,alpha=0.5)
 	ax[3].set_title(r'$s_2(b)$ vs. $s_2(\phi)$', fontsize=14)
 	for k in range(4):
-	    ax[k].grid(True)
-	    #ax[k].axis('square')
+		ax[k].grid(True)
+		#ax[k].axis('square')
 
 	plt.show()
 
